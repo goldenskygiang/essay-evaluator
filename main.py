@@ -1,46 +1,82 @@
-import gradio as gr
-
 from essay_evaluator import EssayEvaluator
-
-"""TODO
-1. Load the model
-2. Create the UI
-3. Serve
-""" 
-
-demoText = "Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula eget dolor. Aenean massa. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec quam felis, ultricies nec, pellentesque eu, pretium quis, sem. Nulla consequat massa quis enim. Donec pede justo, fringilla vel, aliquet nec, vulputate eget, arcu. In enim justo, rhoncus ut, imperdiet a, venenatis vitae, justo. Nullam dictum felis eu pede mollis pretium. Integer tincidunt. Cras dapibus. Vivamus elementum semper nisi. Aenean vulputate eleifend tellus. Aenean leo ligula, porttitor eu, consequat vitae, eleifend ac, enim. Aliquam lorem ante, dapibus in, viverra quis, feugiat a, tellus. Phasellus viverra nulla ut metus varius laoreet. Quisque rutrum. Aenean imperdiet. Etiam ultricies nisi vel augue. Curabitur ullamcorper ultricies nisi. Nam eget dui. Etiam rhoncus. Maecenas tempus, tellus eget condimentum rhoncus, sem quam semper libero, sit amet adipiscing sem neque sed ipsum. Nam quam nunc, blandit vel, luctus pulvinar, hendrerit id, lorem. Maecenas nec odio et ante tincidunt tempus. Donec vitae sapien ut libero venenatis faucibus. Nullam quis ante. Etiam sit amet orci eget eros faucibus tincidunt. Duis leo. Sed fringilla mauris sit amet nibh. Donec sodales sagittis magna. Sed consequat, leo eget bibendum sodales, augue velit cursus nunc, quis gravida magna mi a libero. Fusce vulputate eleifend sapien. Vestibulum purus quam, scelerisque ut, mollis sed, nonummy id, metus. Nullam accumsan lorem in dui. Cras ultricies mi eu turpis hendrerit fringilla. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; In ac dui quis mi consectetuer lacinia. Nam pretium turpis et arcu. Duis arcu tortor, suscipit eget, imperdiet nec, imperdiet iaculis, ipsum. Sed aliquam ultrices mauris. Integer ante arcu, accumsan a, consectetuer eget, posuere ut, mauris. Praesent adipiscing. Phasellus ullamcorper ipsum rutrum nunc. Nunc nonummy metus. Vestibulum volutpat pretium libero. Cras id dui. Aenean ut eros et nisl sagittis vestibulum. Nullam nulla eros, ultricies sit amet, nonummy id, imperdiet feugiat, pede. Sed lectus. Donec mollis hendrerit risus. Phasellus nec sem in justo pellentesque facilisis. Etiam imperdiet imperdiet orci. Nunc nec neque. Phasellus leo dolor, tempus non, auctor et, hendrerit quis, nisi. Curabitur ligula sapien, tincidunt non, euismod vitae, posuere imperdiet, leo. Maecenas malesuada. Praesent congue erat at massa. Sed cursus turpis vitae tortor. Donec posuere vulputate arcu. Phasellus accumsan cursus velit. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Sed aliquam, nisi quis porttitor congue, elit erat euismod orci, ac placerat dolor lectus quis orci. Phasellus consectetuer vestibulum elit. Aenean tellus metus, bibendum sed, posuere ac, mattis non, nunc. Vestibulum fringilla pede sit amet augue. In turpis. Pellentesque posuere. Praesent turpis. Aenean posuere, tortor sed cursus feugiat, nunc augue blandit nunc, eu sollicitudin urna dolor sagittis lacus. Donec elit libero, sodales nec, volutpat a, suscipit non, turpis. Nullam sagittis. Suspendisse pulvinar, augue ac venenatis condimentum, sem libero volutpat nibh, nec pellentesque velit pede quis nunc. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Fusce id purus. Ut varius tincidunt libero. Phasellus dolor. Maecenas vestibulum mollis"
-
-def splitter(start, end, str):
-    pieces = str.split()
-    return " ".join(pieces[start : end + 1])
+import gradio as gr
 
 evaluator = EssayEvaluator(
     discourse_recognizer_params={},
     discourse_evaluator_params={"weights": "./discourse_evaluator/pretrained/bert-base.pth"}
 )
 
+def splitter(start, end, str):
+    pieces = str.split()
+    return " ".join(pieces[start : end + 1])
+
 def greet(essay):
     essay_list = evaluator.process(essay)
-    #essay = demoText
-    #essay_list = [{"start" : 1, "end": 100, "type": "Lead", "effectiveness": "Useless", "score": 80},
-    #              {"start": 101, "end": 200, "type": "Position", "effectiveness": "Useful", "score":60}]
+    essay_list.append({"start" : -1, "end": 0, "type": None, "effectiveness": None, "score": None})
+    sorted_essay = sorted(essay_list, key=lambda d: d['start'])
     outputText = []
-    for essaySegment in essay_list:
-        segmentText = f"[TYPE: {essaySegment['type']}, COMMENT: {essaySegment['effectiveness']}, SCORE: {essaySegment['score']}]\n"
-        outputText.append((segmentText, "Evaluate"))
-        segmentText = splitter(essaySegment['start'], essaySegment['end'], essay) + '\n'
-        outputText.append((segmentText, essaySegment['type']))
+    for i in range(1, len(sorted_essay)):
+        if (sorted_essay[i]['start'] > sorted_essay[i - 1]['end'] + 1):
+            segmentText = splitter(sorted_essay[i - 1]['end'] + 1, sorted_essay[i]['start'] - 1, essay) + '\n'
+            outputText.append((segmentText, None))
+        segmentText = f"[{sorted_essay[i]['effectiveness']} | {sorted_essay[i]['score']:.2f}]\n"
+        outputText.append((segmentText, sorted_essay[i]['type']))
+        segmentText = splitter(sorted_essay[i]['start'], sorted_essay[i]['end'], essay) + '\n'
+        outputText.append((segmentText, sorted_essay[i]['type']))
         outputText.append(('\n', None))
     return outputText
 
-
+def html_create():
+    # Creating the HTML file
+    file_html = open("demo.html", "w")
+    # Adding the input data to the HTML file
+    file_html.write("""<html>
+    <head>
+    <title>HTML File</title>
+    </head> 
+    <body>
+    <img src="banner_demoday.jpg" alt="demo banner">
+    </body>
+    </html>""")
+    # Saving the data into the HTML file
+    file_html.close()
+    
 demo = gr.Interface(
     
     fn=greet,
-    inputs=gr.Textbox(lines=2, placeholder="Please input your essay here to evaluate..."),
+    inputs=gr.Textbox(lines=2,
+        label = "Essay",
+        placeholder="Please input your essay here to evaluate..."),
     outputs= gr.Highlightedtext(
       label = "Segmentation",
-      combine_adjacent = True,
+      combine_adjacent = False,
+      show_legend = True
     ),
+    examples=[
+        [
+"""Dear Senator
+
+I feel that electoral college should stay becuase it set's straight the manege for the peoples votes for the president. Even thow if a tie the election would be thrown to the house of represenatives were they decide on the new president. The electoral college is a process its not a place. It shows that the founding fathers established it for the compromise between elections between the president by a vote in congress. The electoral college consists of 538 electors. Plus a majority of 270 electoral votes is required to elect the president .It say's in the passage that under the 23rd Amendment of the constiton that the district of colombia is allocated 3 electors and treated like a state for the purposes of electoral college. On many cases 60 percent of voters would perfer a direct election. The electoral college system states that voters vote not for the president,but for a state of eletors who elect the president. I think that they should have the right to elect the president that would make this nation grow stonger not to make mistakes and lead us to problems which they can decide to choose the future of the united states. Many people have diffrent opinions as me but not all will get the same results as they wanted. The effects of the electoral college has been giving us positive values. As we live on since back of the elections day we are still here becuase of thow,s elections it made us who we are american citizions of the USA.History depends on the future rights of the president thats why the electoral college is there to help make that happen."""
+        ],
+
+        [
+"""Imagine for a minute that you are at school, on three hours of sleep with an innate ability to care for anything at this present time. You wish that you could just crawl back into your hovel and sleep for a few more hours. Despite your most earnest wishes, however, your required presence at school forbids such activities from transpiring. Luckily for you, there is yet a ray of hope. Some schools have begun to offer distance learning as a way for students to attend from home, usually via online means. I believe that students stand to gain from this alternate method of attendance. I think this because distance learning decreases stress on students, reduces bullying, and is a healthy alternative for students with social anxiety. Furthermore, distance learning provides the student with an enhanced ability to pursue self-education.
+
+For many students, school can be the progenitor of a stressful and mentally debilitating environment. This, consequentially, leads to a decrease in a student's mental and even physical health. This negative environment is usually achieved though an overabundance of homework and classwork, as well as assorted busy-work and tight deadlines. Through that invention which is distance learning, students will have an option to choose a slower-paced working environment. When working from a computer, classwork and homework lose distinction, and just become "work," as there is no assigned place to start and finish it. This alone would do wonders for the mental health of students. To use an example from my own experiences with distance learning, I have found assignments done online to be more enjoyable and less stressful than those done in a classroom.
+
+Another factor that would considerably benefit student health is the drastic reduction in instances of bullying that distance learning would bring. For the uninitiated, bullying is when one person engages in harmful acts repeatedly and over an extended period of time against another person. Schools have only served to increase instances of bullying through zero-tolerance policies, in which the victim is punished equally as much as the aggressor. This also leads to students being afraid to report bullying, as they would also risk punishment. Distance learning would reduce bullying by putting "distance" between a bully and a victim of bullying. While cyberbulling would still be present, as well as an issue, it is considerably less damaging when compared to the verbal and physical confrontations that can be seen on school grounds.
+
+Distance learning would also be considered a pious alternative of sorts for those students who do not hold social interaction in high esteem, myself included. While most students can be considered to be outgoing in one way or another, there is a large minority of students that range from being just generally introverted to having crippling social anxiety. Their needs are usually overlooked in most schools, where the social climate in many cases is best described as "riotous." The prospect of attending classes from home for these students would be incredibly enticing, and would be calming for them. To use another personal example, I often find myself to be more productive at home than I do at school, in part because of the disruptive social climate that classrooms have.
+
+Perhaps the most consequential result of distance learning would be an enhancement in the student's ability to pursue self-education. Self-education is, unsurprisingly, when a student independently seeks out and digests information, whether it is needed for school or not. Self-education can also have a profound effect on students, whether by giving them a higher grade on a test, or leading them to decide on a college major based off of a topic that they find to be interesting. To use myself an example, I have been educating myself on matters of Astronomy, Military History, and Geography for approximately 7 years now. In that time, I have participated in three state-level geography competitions, the second of which ranked me as third in the state in knowledge of Ancient Geography. In Astronomy, my self-education allowed me to get full marks on almost every Astronomy-related assignment in school, and in Military History, perhaps my strongest subject, I have connected myself with various historians and am currently making inroads into publishing work of my own design in a Military Journal. With distance learning, myself and every other like-minded student would have more time to pursue these subjects.
+
+In conclusion, it is my belief that students would benefit immensely from distance learning. Working from home would take students out of a stressful school environment, and by extension protect them from bullying. That same home environment would also be better suited for more introverted students, who might feel anxious while being in school. Distance learning would also allow students to better pursue self-education, which would have positive effects for them presently and also later in life. Overall, distance learning stands to enrich the lives of students, while also serving to better their mental and physical health."""
+        ]
+    ],
+    description=(
+                "<div>"
+                "<img  src='file/banner_demoday2.jpg' alt='image One'>"
+                + "</div>"
+                ),
 )
 demo.launch(share=True)
